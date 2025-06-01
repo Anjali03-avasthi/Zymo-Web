@@ -96,7 +96,7 @@ const ExtendedTestDriveSummary = ({ title }) => {
   const onSubmit = () => {
     navigate("/buy-car/date-picker", {
       state: {
-        car: car,
+        car: { ...car, totalAmount: totalAmount },
         selectedDate,
         selectedLocation,
       },

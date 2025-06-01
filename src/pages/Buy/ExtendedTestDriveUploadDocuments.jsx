@@ -210,6 +210,7 @@ const ExtendedTestDriveUploadDocuments = ({ title }) => {
     }
     toast.dismiss();
     try {
+      console.log("car details:", car);
       const amount = parseInt(car.totalAmount);
       const orderData = await createOrder(amount, "INR");
 
