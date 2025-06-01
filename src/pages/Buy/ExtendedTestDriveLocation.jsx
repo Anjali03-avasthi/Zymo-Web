@@ -122,13 +122,14 @@ const ExtendedTestDriveLocation = ({ title }) => {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const { car: originalCar } = routerLocation.state || {};
-
   // Location states
   const [placeInput, setPlaceInput] = useState("");
   const [place, setPlace] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
+  const [lat, setLat] = useState(0);
+  const [lng, setLng] = useState(0);
   // Date states
   const [startDate, setStartDate] = useState(new Date(getCurrentTime()));
   const [endDate, setEndDate] = useState(
@@ -288,7 +289,6 @@ const ExtendedTestDriveLocation = ({ title }) => {
     console.warn("No suitable city component found");
     return "";
   };
-
   const handleSuggestionClick = async (sugg) => {
     isManuallySelected.current = true;
     setPlaceInput(sugg.fullAddress);
@@ -302,13 +302,17 @@ const ExtendedTestDriveLocation = ({ title }) => {
       setCity(simpleCityName);
 
       const location = placeDetails.Eg?.location || {};
-      const lat = location.lat ?? "";
-      const lng = location.lng ?? "";
+      const latValue = location.lat ?? 0;
+      const lngValue = location.lng ?? 0;
+
+      // Set lat/lng state for Zoomcar API
+      setLat(latValue);
+      setLng(lngValue);
 
       setPlace({
         name: placeDetails.displayName || sugg.fullAddress,
-        lat,
-        lng,
+        lat: latValue,
+        lng: lngValue,
         addressComponents: placeDetails.addressComponents || [],
       });
 
@@ -318,6 +322,9 @@ const ExtendedTestDriveLocation = ({ title }) => {
       setCity(sugg.city?.split(",")[0].trim() || "");
       setPlace(sugg);
       setAddress(sugg.fullAddress);
+      // Set default coordinates if no place details
+      setLat(0);
+      setLng(0);
     }
   };
 
@@ -344,8 +351,7 @@ const ExtendedTestDriveLocation = ({ title }) => {
     }
 
     return "";
-  };
-  const getCurrentLocation = () => {
+  };  const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       return;
@@ -374,6 +380,10 @@ const ExtendedTestDriveLocation = ({ title }) => {
               lng: longitude,
               addressComponents: result.address_components,
             });
+
+            // Set lat/lng state for Zoomcar API
+            setLat(latitude);
+            setLng(longitude);
 
             setCity(cityName);
             setAddress(fullAddress);
@@ -441,17 +451,23 @@ const ExtendedTestDriveLocation = ({ title }) => {
 
       // Convert dates to epoch for Zoomcar API
       const startDateEpoc = Math.floor(startDateTime.getTime() / 1000);
-      const endDateEpoc = Math.floor(endDateTime.getTime() / 1000);
-
-      // Fetch from Zoomcar
+      const endDateEpoc = Math.floor(endDateTime.getTime() / 1000);      // Fetch from Zoomcar
       const fetchZoomcarData = async () => {
+        console.log("Zoomcar API payload:", {
+          city: formattedCity,
+          lat: lat,
+          lng: lng,
+          fromDate: startDateEpoc,
+          toDate: endDateEpoc,
+        });
+
         const response = await fetch(`${url}/zoomcar/search`, {
           method: "POST",
           body: JSON.stringify({
             data: {
               city: formattedCity,
-              lat: 0, // We don't have lat/lng in test drive context
-              lng: 0,
+              lat: lat, // Use actual latitude
+              lng: lng, // Use actual longitude
               fromDate: startDateEpoc,
               toDate: endDateEpoc,
             },
@@ -590,7 +606,7 @@ const ExtendedTestDriveLocation = ({ title }) => {
     } finally {
       setLoadingCars(false);
     }
-  }, [city, startDate, endDate, originalCar, address]);
+  }, [city, startDate, endDate, originalCar, address, lat, lng]);
 
   const handleDateSelection = (value) => {
     setStartDate(value);

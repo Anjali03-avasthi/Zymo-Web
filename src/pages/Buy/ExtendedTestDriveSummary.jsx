@@ -220,7 +220,7 @@ const ExtendedTestDriveSummary = ({ title }) => {
                 <div className="flex flex-col justify-between items-center">
                   <span className="text-gray-300">Free Kilometers</span>
                   <span className="text-white font-medium">
-                    {originalCar?.freeKilometers.toLocaleString()} Km
+                    {originalCar?.freeKilometers?.toLocaleString() || 1500} Km
                   </span>
                 </div>
                 <div className="flex flex-col justify-between items-center">

@@ -25,7 +25,6 @@ const NearestCar = ({ title }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const url = import.meta.env.VITE_FUNCTIONS_API_URL;
 
   useEffect(() => {
     document.title = title;
@@ -48,19 +47,6 @@ const NearestCar = ({ title }) => {
         setLoading(false);
       }
     };
-
-    (async () => {
-      const myChoizeSubscribtionCars = await fetchSubscriptionCars(
-        "mumbai",
-        formatDateForMyChoize(Date.now() + 24 * 60 * 60 * 1000), // For 1 day
-        formatDateForMyChoize(Date.now() + 30 * 24 * 60 * 60 * 1000) // For 30 days
-      );
-
-      console.log(
-        "Fetched MyChoize Subscription Cars:",
-        myChoizeSubscribtionCars
-      );
-    })();
 
     fetchCarsData();
   }, []);
