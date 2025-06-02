@@ -4,7 +4,6 @@ import {
   MapPinIcon,
   ChevronDown,
   ChevronUp,
-
 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
@@ -92,9 +91,7 @@ function BookingPage() {
   const [showCoupons, setShowCoupons] = useState(false); //list of coupon codes
 
   //array of coupon c
-  const couponCodes = [
-    "ZYMOWEB",
-  ];
+  const couponCodes = ["ZYMOWEB"];
   const [loading, setLoading] = useState(false);
 
   const customerUploadDetails = formData && uploadDocData;
@@ -135,12 +132,14 @@ function BookingPage() {
 
     return () => unsubscribe();
   }, []);
-  const vendor =
-    car.source === "zoomcar"
-      ? "ZoomCar"
-      : car.source === "mychoize"
-        ? "Mychoize"
-        : car.source;
+  let vendor;
+  if (car.source === "zoomcar") {
+    vendor = "ZoomCar";
+  } else if (car.source === "mychoize") {
+    vendor = "Mychoize";
+  } else {
+    vendor = car.source;
+  }
 
   useEffect(() => {
     const fetchVendorDetails = async () => {
@@ -187,7 +186,10 @@ function BookingPage() {
     // Get the base fare from car data
     let baseFare = car.actualPrice || currencyToInteger(car.fare);
     if (car.source === "Karyana" || car.source === "ZT") {
+      console.log(car);
       baseFare = currencyToInteger(car.inflated_fare);
+      setSelectedPickupLocation(car.pick_up_location);
+      setSelectedDropLocation(car.pick_up_location);
     } else if (car.source === "mychoize") {
       baseFare = car.rateBasisFare[car.rateBasis];
     }
@@ -263,28 +265,34 @@ function BookingPage() {
         noDiscountAmount = Math.round(parseInt(baseFare) + withGST);
         setPayableAmount(noDiscountAmount + parseInt(securityDeposit));
       } else {
-        noDiscountAmount = Math.round(parseInt(basePrice) + withGST + parseInt(securityDeposit));
+        noDiscountAmount = Math.round(
+          parseInt(basePrice) + withGST + parseInt(securityDeposit)
+        );
         setPayableAmount(noDiscountAmount);
       }
       finalAmount = noDiscountAmount;
     }
-
   }, [
     car, // Include the whole car object
     vendorDetails,
     couponCode,
-    securityDeposit // Add securityDeposit as it's used in calculations
+    securityDeposit, // Add securityDeposit as it's used in calculations
   ]);
 
   useEffect(() => {
     if (selectedPickupLocation && selectedDropLocation) {
       const newDeliveryCharges =
-        parseInt(selectedPickupLocation.DeliveryCharge) +
-        parseInt(selectedDropLocation.DeliveryCharge);
+        (parseInt(selectedPickupLocation.DeliveryCharge) +
+        parseInt(selectedDropLocation.DeliveryCharge)) || 0;
+
+      console.log("New Delivery Charges:", newDeliveryCharges);
       setPayableAmount((prevAmount) => {
         return prevAmount - deliveryCharges + newDeliveryCharges;
       });
+
+      console.log("Updated Payable Amount:", payableAmount);
       setDeliveryCharges(newDeliveryCharges);
+      console.log("Updated Delivery Charges:", newDeliveryCharges);
     }
   }, [selectedPickupLocation, selectedDropLocation, deliveryCharges]);
 
@@ -589,21 +597,21 @@ function BookingPage() {
         autoClose: 5000,
       });
     }
-    // initiateRefund(data.razorpay_payment_id).then(
-    //     (refundResponse) => {
-    //         if (refundResponse.status === "processed") {
-    //             navigate("/");
-    //             toast.success(
-    //                 "A refund has been processed, please check your mail for more details",
-    //                 {
-    //                     position: "top-center",
-    //                     autoClose: 1000 * 10,
-    //                 }
-    //             );
-    //         }
-    //     }
-    // );
   };
+
+  const handleOthersVendorBooking = async (paymentData) => {
+    try {
+      saveSuccessfulBooking(paymentData.razorpay_payment_id);
+      //! send whatsapp notif to user and vendor
+      setIsConfirmPopupOpen(true);
+    } catch (error) {
+      console.error(error.message);
+      toast.error("Booking Creation Failed...", {
+        position: "top-center",
+        autoClose: 5000,
+      });
+    }
+  };  
 
   const createBooking = async () => {
     const startDateEpoc = Date.parse(startDate);
@@ -811,8 +819,11 @@ function BookingPage() {
               handleMychoizeBooking(data);
             } else if (vendor === "ZoomCar") {
               handleZoomcarBooking(data);
+            } else if (vendor === "Zymo") {
+              handleOthersVendorBooking(data);
+            } else if (vendor === "Karyana") {
+              handleOthersVendorBooking(data);
             }
-            
           } else {
             toast.error("Payment error, Please try again...", {
               position: "top-center",
@@ -849,7 +860,7 @@ function BookingPage() {
   };
 
   const handleUploadDocuments = () => {
-    console.log(selectedPickupLocation, selectedDropLocation)
+    console.log(selectedPickupLocation, selectedDropLocation);
     if (!selectedPickupLocation || !selectedDropLocation) {
       toast.warn("Please choose the pickup and drop locations", {
         position: "top-center",
@@ -1042,7 +1053,6 @@ function BookingPage() {
                 </div>
               )}
             </div>
-
           </div>
 
           {/* Book Button */}
@@ -1189,7 +1199,6 @@ function BookingPage() {
 
           {/* Pickup Details */}
 
-         
           {car.source === "mychoize" && (
             <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
               <div className="mt-5 mb-4">
@@ -1201,10 +1210,11 @@ function BookingPage() {
                   onClick={() => setShowPickupPopup(true)}
                 >
                   {selectedPickupLocation
-                    ? `${selectedPickupLocation.LocationName} | ${selectedPickupLocation.IsPickDropChargesApplicable
-                      ? `₹${selectedPickupLocation.DeliveryCharge}`
-                      : "FREE"
-                    }`
+                    ? `${selectedPickupLocation.LocationName} | ${
+                        selectedPickupLocation.IsPickDropChargesApplicable
+                          ? `₹${selectedPickupLocation.DeliveryCharge}`
+                          : "FREE"
+                      }`
                     : "Select pickup location"}
                 </div>
                 <textarea
@@ -1228,10 +1238,11 @@ function BookingPage() {
                   onClick={() => setShowDropupPopup(true)}
                 >
                   {selectedDropLocation
-                    ? `${selectedDropLocation.LocationName} | ${selectedDropLocation.IsPickDropChargesApplicable
-                      ? `₹${selectedDropLocation.DeliveryCharge}`
-                      : "FREE"
-                    }`
+                    ? `${selectedDropLocation.LocationName} | ${
+                        selectedDropLocation.IsPickDropChargesApplicable
+                          ? `₹${selectedDropLocation.DeliveryCharge}`
+                          : "FREE"
+                      }`
                     : "Select drop location"}
                 </div>
                 <textarea
@@ -1260,21 +1271,21 @@ function BookingPage() {
               )}
             </div>
           )}
-{car.source === "Karyana" && (
-  <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
-    <div className="mt-5 mb-4">
-      <label className="block text-sm font-medium mb-1 text-[#faffa4]">
-        Pickup Location
-      </label>
-      <div className="bg-[#404040] text-white p-3 rounded-md">
-        {car.pick_up_location
-          ? car.pick_up_location
-          : "Pickup location not available"}
-      </div>
-    </div>
-    {/* If you want to show drop location, add similar block here */}
-  </div>
-)}
+          {car.source === "Karyana" && (
+            <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
+              <div className="mt-5 mb-4">
+                <label className="block text-sm font-medium mb-1 text-[#faffa4]">
+                  Pickup Location
+                </label>
+                <div className="bg-[#404040] text-white p-3 rounded-md">
+                  {car.pick_up_location
+                    ? car.pick_up_location
+                    : "Pickup location not available"}
+                </div>
+              </div>
+              {/* If you want to show drop location, add similar block here */}
+            </div>
+          )}
           {/* zoom car section */}
           {car.source === "zoomcar" && (
             <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-1 ">
@@ -1374,10 +1385,11 @@ function BookingPage() {
               <div className="flex flex-col justify-center items-center">
                 <button
                   className={`px-6 py-2 rounded-lg font-semibold  transition-colors
-                                ${!customerUploadDetails
-                      ? "text-black bg-appColor hover:bg-[#e2ff5d] cursor-pointer"
-                      : "text-appColor bg-transparent border-2 border-appColor cursor-not-allowed"
-                    }`}
+                                ${
+                                  !customerUploadDetails
+                                    ? "text-black bg-appColor hover:bg-[#e2ff5d] cursor-pointer"
+                                    : "text-appColor bg-transparent border-2 border-appColor cursor-not-allowed"
+                                }`}
                   onClick={handleUploadDocuments}
                   disabled={customerUploadDetails}
                 >
