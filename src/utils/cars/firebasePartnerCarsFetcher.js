@@ -165,7 +165,7 @@ export const fetchFirebaseCars = async (city, tripDurationHours) => {
       city,
       tripDurationHours
     );
-
+console.log("Test collections cars karyana :", testCollections);
     if (testCollections && testCollections.length > 0) {
       allCars = [...allCars, ...testCollections];
     } else {
@@ -229,6 +229,7 @@ export const fetchFirebaseCars = async (city, tripDurationHours) => {
           ],
           address:
             car.pickupLocations?.[toPascalCase(city)] || car.address || "",
+          pickupLocation: car.pick_up_location,
           images: car.images ||
             car.image_urls || ["/images/Cars/default-car.png"],
           fare: car.fare,

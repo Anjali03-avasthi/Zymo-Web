@@ -1189,6 +1189,7 @@ function BookingPage() {
 
           {/* Pickup Details */}
 
+         
           {car.source === "mychoize" && (
             <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
               <div className="mt-5 mb-4">
@@ -1259,7 +1260,21 @@ function BookingPage() {
               )}
             </div>
           )}
-
+{car.source === "Karyana" && (
+  <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
+    <div className="mt-5 mb-4">
+      <label className="block text-sm font-medium mb-1 text-[#faffa4]">
+        Pickup Location
+      </label>
+      <div className="bg-[#404040] text-white p-3 rounded-md">
+        {car.pick_up_location
+          ? car.pick_up_location
+          : "Pickup location not available"}
+      </div>
+    </div>
+    {/* If you want to show drop location, add similar block here */}
+  </div>
+)}
           {/* zoom car section */}
           {car.source === "zoomcar" && (
             <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-1 ">
