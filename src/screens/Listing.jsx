@@ -349,6 +349,12 @@ const Listing = ({ title }) => {
 
           if (firebaseData.status === "fulfilled" && firebaseData.value) {
             allCarData = [...allCarData, ...firebaseData.value];
+            for (const car of firebaseData.value) {
+              if(car.vendor=="Karyana"){
+                console.log("Karyana car found:", car.pickupLocation);
+              }
+            }
+
           } else {
             console.error("Firebase API failed:", firebaseData.reason);
           }

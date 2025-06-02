@@ -46,6 +46,8 @@ export const fetchAllTestCollections = async function (
       deliveryCharges:
         car.deliveryCharges.find((d) => d.pickupAddress === "Delivery & Pickup")
           ?.deliveryCharge || 800,
+      pick_up_location:car.pickupLocation || "Delhi",
+      
       yearOfRegistration:
         car.yearOfRegistration || new Date().getFullYear() - 2,
       ratingData: {
@@ -164,8 +166,7 @@ export const fetchAllTestCollections = async function (
                     actualPrice: basePrice,
                     perHourRate: perHourRate.toFixed(0),
                     baseHourlyPrice: baseHourlyPrice, // Store the base calculation before vendor rates
-                    pickupLocation:
-                      carData["Pick-up location"] ||
+                    pickupLocation:carData["Pick-up location"] ||
                       carData.pickupLocation ||
                       "",
                     transmission:
