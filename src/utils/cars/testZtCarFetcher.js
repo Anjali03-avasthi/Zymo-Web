@@ -30,7 +30,7 @@ export const fetchAllTestZtCollections = async function (
       partnerBrandName: vendorDetails?.vendor,
       options: [car.transmission, car.fuelType, `${car.seats} Seats`],
       address: car.pickupLocation,
-      images: Array.isArray(car.imageUrls) ?  car.imageUrls : [car.imageUrls],
+      images: Array.isArray(car.imageUrls) ? car.imageUrls : [car.imageUrls],
       fare: formatFare(Math.round(finalPrice)),
       inflated_fare: formatFare(Math.round(inflatedFare)),
       actualPrice: inflatedFare,
@@ -38,10 +38,8 @@ export const fetchAllTestZtCollections = async function (
       extrakm_charge: car.extraKmRate,
       extrahour_charge: car.extraHourRate,
       securityDeposit: car.securityDeposit,
-      pickups: car.deliveryCharges,
-      deliveryCharges:
-        car.deliveryCharges.find((d) => d.pickupAddress === "Delivery & Pickup")
-          ?.deliveryCharge || 800,
+      pickupLocation: car.pickupLocation,
+      deliveryCharge: car.deliveryCharge,
       yearOfRegistration:
         car.yearOfRegistration || new Date().getFullYear() - 2,
       ratingData: {
@@ -91,7 +89,6 @@ export const fetchAllTestZtCollections = async function (
           const cityRef = collection(appDB, "testZt", city, carCollection);
           const cityDoc = await getDocs(cityRef);
 
-
           if (cityDoc.empty) {
             continue;
           }
@@ -128,8 +125,8 @@ export const fetchAllTestZtCollections = async function (
               actualPrice: basePrice,
               perHourRate: perHourRate,
               baseHourlyPrice: baseHourlyPrice,
-              pickupLocation:
-                carData["Pick-Up location"] || carData.pickupLocation || "",
+              pickupLocation: carData["Pick-Up location"],
+              deliveryCharge: parseInt(carData["Home Delivery Charges"]),
               transmission:
                 carData["Transmission"] || carData.transmission || "Manual",
               fuelType: carData["Fuel Type"] || carData.fuelType || "Petrol",
@@ -139,16 +136,6 @@ export const fetchAllTestZtCollections = async function (
               kmLimit: freeKms,
               imageUrls: carData["imageUrl"],
               isSoldOut: Boolean(carData["isSoldOut"]) || false,
-              deliveryCharges: [
-                {
-                  pickupAddress: carData["Pick-Up location"] || "",
-                  deliveryCharge: 0,
-                },
-                {
-                  pickupAddress: "Delivery & Pickup",
-                  deliveryCharge: parseInt(carData["Home Delivery Charges"]),
-                },
-              ],
               seats:
                 parseInt(carData["No of Seats"]) ||
                 parseInt(carData.seats) ||
@@ -220,7 +207,6 @@ export const fetchAllTestZtCollections = async function (
 
       return Object.values(groupedCars);
     };
-
 
     return groupTheCarsByName(formattedTestCars);
   } catch (error) {

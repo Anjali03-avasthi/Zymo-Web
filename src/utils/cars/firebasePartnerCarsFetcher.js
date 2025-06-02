@@ -69,8 +69,6 @@ export const fetchFirebaseCars = async (city, tripDurationHours) => {
 
           const partnerCars = carsSnapshot.docs.map((doc) => {
             const carData = doc.data();
-            console.log("Car data:", carData, "source: ", partner.brandName);
-            // minimum booking duration for car
 
             const minBookingDuration = carData.minBookingDuration;
 
@@ -135,6 +133,7 @@ export const fetchFirebaseCars = async (city, tripDurationHours) => {
               partnerLogo: partner.logo,
               partnerPhone: partner.phone,
               partnerEmail: partner.email,
+              pick_up_location: carData.pickupLocation,
               carName: carData.carName || carData.name,
               carType: carData.carType || carData.type,
               carBrand: carData.carBrand || carData.brand,
@@ -165,12 +164,10 @@ export const fetchFirebaseCars = async (city, tripDurationHours) => {
       city,
       tripDurationHours
     );
-console.log("Test collections cars karyana :", testCollections);
+
     if (testCollections && testCollections.length > 0) {
       allCars = [...allCars, ...testCollections];
-    } else {
-      console.log(`No test collection cars found for ${city}`);
-    }
+    } 
     // Step 4.5: Fetch cars from testKos collections
     const testKosCollections = await fetchAllTestKosCollections(
       appDB,
@@ -180,13 +177,8 @@ console.log("Test collections cars karyana :", testCollections);
     );
 
     if (testKosCollections && testKosCollections.length > 0) {
-      console.log(
-        `Found ${testKosCollections.length} testKos collection cars for ${city}`
-      );
       allCars = [...allCars, ...testKosCollections];
-    } else {
-      console.log(`No testKos collection cars found for ${city}`);
-    }
+    } 
     // Step 4.5: Fetch cars from testKos collections
     const testZtCollections = await fetchAllTestZtCollections(
       appDB,
@@ -196,13 +188,7 @@ console.log("Test collections cars karyana :", testCollections);
     );
 
     if (testZtCollections && testZtCollections.length > 0) {
-      console.log(
-        `Found ${testZtCollections.length} testZt collection cars for ${city}`
-      );
       allCars = [...allCars, ...testZtCollections];
-      console.log("All cars from testZt collections:", testZtCollections);
-    } else {
-      console.log(`No testZt collection cars found for ${city}`);
     }
     // Step 5: Map car data to the expected format
     const filterdData = allCars
@@ -261,10 +247,9 @@ console.log("Test collections cars karyana :", testCollections);
           variations: car.variations || [],
         };
       });
-    console.log("Filtered data:", filterdData);
+
     return filterdData;
 
-    // return [];
   } catch (error) {
     console.error("Error fetching Firebase cars:", error);
     return [];

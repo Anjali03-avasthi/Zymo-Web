@@ -90,6 +90,16 @@ function BookingPage() {
   const [couponCode, setCouponCode] = useState("ZYMOWEB");
   const [showCoupons, setShowCoupons] = useState(false); //list of coupon codes
 
+  // Home delivery states
+  const [deliveryType, setDeliveryType] = useState("self-pickup"); // "self-pickup" or "home-delivery"
+  const [homeDeliveryCharges, setHomeDeliveryCharges] = useState(0);
+
+  // Home delivery address fields
+  const [street1, setStreet1] = useState("");
+  const [street2, setStreet2] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [zipcode, setZipcode] = useState("");
+
   //array of coupon c
   const couponCodes = ["ZYMOWEB"];
   const [loading, setLoading] = useState(false);
@@ -176,9 +186,12 @@ function BookingPage() {
 
     if (car.source === "Zymo") {
       setPackageSelected(car.total_km[car.selectedPackage]);
+      setSelectedPickupLocation(car.pickupLocation);
+      setSelectedDropLocation(car.pickupLocation);
     }
     if (car.source === "ZT") {
       setPackageSelected(car?.total_km?.FF);
+      setDeliveryType("home-delivery"); // ZT only supports home delivery
     } else {
       setPackageSelected(findPackage(car.rateBasis));
     }
@@ -252,7 +265,18 @@ function BookingPage() {
 
     if (couponCode === "ZYMOWEB") {
       setDiscount(calculatedVendorDiscountValue);
-      setPayableAmount(parseInt(finalAmount) + parseInt(securityDeposit));
+      let finalPayableAmount =
+        parseInt(finalAmount) + parseInt(securityDeposit);
+
+      // Add delivery charges if applicable
+      if (car.source === "ZT") {
+        const ztDeliveryCharges = car.deliveryCharge || 0;
+        finalPayableAmount += ztDeliveryCharges;
+      } else if (car.source === "Karyana" && deliveryType === "home-delivery") {
+        finalPayableAmount += homeDeliveryCharges;
+      }
+
+      setPayableAmount(finalPayableAmount);
     } else {
       setDiscount(0);
       let noDiscountAmount = 0;
@@ -261,9 +285,24 @@ function BookingPage() {
         // For ZT cars:
         // - Use baseFare directly (inflated_fare) without applying currentRate
         // - Add GST if applicable
-        // - Add security deposit at the end
+        // - Add security deposit and delivery charges at the end
         noDiscountAmount = Math.round(parseInt(baseFare) + withGST);
-        setPayableAmount(noDiscountAmount + parseInt(securityDeposit));
+        const ztDeliveryCharges = car.deliveryCharge || 0;
+        setPayableAmount(
+          noDiscountAmount + parseInt(securityDeposit) + ztDeliveryCharges
+        );
+      } else if (car.source === "Karyana") {
+        // For Karyana cars:
+        noDiscountAmount = Math.round(
+          parseInt(basePrice) + withGST + parseInt(securityDeposit)
+        );
+        
+        // Add delivery charges if home delivery is selected
+        if (deliveryType === "home-delivery") {
+          noDiscountAmount += homeDeliveryCharges;
+        }
+        
+        setPayableAmount(noDiscountAmount);
       } else {
         noDiscountAmount = Math.round(
           parseInt(basePrice) + withGST + parseInt(securityDeposit)
@@ -277,13 +316,15 @@ function BookingPage() {
     vendorDetails,
     couponCode,
     securityDeposit, // Add securityDeposit as it's used in calculations
+    deliveryType, // Add delivery type as dependency
+    homeDeliveryCharges, // Add home delivery charges as dependency
   ]);
 
   useEffect(() => {
     if (selectedPickupLocation && selectedDropLocation) {
       const newDeliveryCharges =
-        (parseInt(selectedPickupLocation.DeliveryCharge) +
-        parseInt(selectedDropLocation.DeliveryCharge)) || 0;
+        parseInt(selectedPickupLocation.DeliveryCharge) +
+          parseInt(selectedDropLocation.DeliveryCharge) || 0;
 
       console.log("New Delivery Charges:", newDeliveryCharges);
       setPayableAmount((prevAmount) => {
@@ -295,6 +336,28 @@ function BookingPage() {
       console.log("Updated Delivery Charges:", newDeliveryCharges);
     }
   }, [selectedPickupLocation, selectedDropLocation, deliveryCharges]);
+
+  // Handle home delivery charges for different vendors
+  useEffect(() => {
+    let charges = 0;
+    
+    if (car.source === "ZT") {
+      // For ZT, home delivery is mandatory
+      charges = car.deliveryCharge || 0;
+    } else if (car.source === "Karyana" && deliveryType === "home-delivery") {
+      // For Karyana, get delivery charges from pickups array when home delivery is selected
+      const homeDeliveryOption = car.pickups?.find(pickup => pickup.deliveryCharge > 0);
+      charges = homeDeliveryOption?.deliveryCharge || 0;
+    } else if (car.source === "Zymo" && deliveryType === "home-delivery") {
+      // For Zymo, home delivery is free
+      charges = 0;
+    } else {
+      // Self pickup or other vendors
+      charges = 0;
+    }
+    
+    setHomeDeliveryCharges(charges);
+  }, [deliveryType, car.source, car.deliveryCharge, car.pickups]);
 
   const preBookingData = {
     headerDetails: {
@@ -453,7 +516,10 @@ function BookingPage() {
       Balance: 0,
       CarImage: car.images[0],
       CarName: `${car.brand} ${car.name}`,
-      City: city,
+      City:
+        car.source === "ZT" || deliveryType === "home-delivery"
+          ? deliveryCity
+          : city,
       DateOfBirth: formData?.dob || "",
       DateOfBooking: Date.now(),
       Documents: documents,
@@ -473,18 +539,30 @@ function BookingPage() {
       SecurityDeposit: vendorDetails?.Securitydeposit,
       StartDate: startDateFormatted,
       StartTime: "",
-      Street1: "",
-      Street2: "",
+      Street1:
+        car.source === "ZT" || deliveryType === "home-delivery" ? street1 : "",
+      Street2:
+        car.source === "ZT" || deliveryType === "home-delivery" ? street2 : "",
       TimeStamp: formatDate(Date.now()),
       Transmission: car.options[0],
       UserId: userData.uid,
       Vendor: vendor,
-      Zipcode: "",
-      actualPrice: parseInt(car.inflated_fare.slice(1)),
+      Zipcode:
+        car.source === "ZT" || deliveryType === "home-delivery" ? zipcode : "",
+      actualPrice: parseInt(
+        car.inflated_fare?.slice(1) || car.fare?.slice(1) || 0
+      ),
       bookingId,
-      deliveryType: selectedPickupLocation?.LocationName?.includes("Doorstep")
-        ? "Doorstep Delivery"
-        : "Self Pickup",
+      deliveryType:
+        car.source === "ZT"
+          ? "Home Delivery"
+          : (car.source === "Karyana" || car.source === "Zymo") &&
+            deliveryType === "home-delivery"
+          ? "Home Delivery"
+          : selectedPickupLocation?.LocationName?.includes("Doorstep")
+          ? "Doorstep Delivery"
+          : "Self Pickup",
+      homeDeliveryCharges: homeDeliveryCharges,
       paymentId,
       price: payableAmount,
     };
@@ -611,7 +689,7 @@ function BookingPage() {
         autoClose: 5000,
       });
     }
-  };  
+  };
 
   const createBooking = async () => {
     const startDateEpoc = Date.parse(startDate);
@@ -774,6 +852,32 @@ function BookingPage() {
 
   const handlePayment = async () => {
     handleBooknpay("Book & Pay");
+
+    // Validate home delivery address for ZT vendors
+    if (
+      car.source === "ZT" &&
+      (!street1.trim() || !deliveryCity.trim() || !zipcode.trim())
+    ) {
+      toast.error("Please fill all required delivery address fields", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Validate home delivery address for Karyana/Zymo when home delivery is selected
+    if (
+      (car.source === "Karyana" || car.source === "Zymo") &&
+      deliveryType === "home-delivery" &&
+      (!street1.trim() || !deliveryCity.trim() || !zipcode.trim())
+    ) {
+      toast.error("Please fill all required delivery address fields", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      return;
+    }
+
     if (car.source != "mychoize" && !handleCustomerDetails()) {
       return;
     }
@@ -822,6 +926,8 @@ function BookingPage() {
             } else if (vendor === "Zymo") {
               handleOthersVendorBooking(data);
             } else if (vendor === "Karyana") {
+              handleOthersVendorBooking(data);
+            } else if (vendor === "ZT") {
               handleOthersVendorBooking(data);
             }
           } else {
@@ -995,6 +1101,23 @@ function BookingPage() {
                 <hr className="border-white/25" />
               </>
             )}
+
+            {homeDeliveryCharges > 0 && (
+              <>
+                <div className="my-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 cursor-pointer">
+                    <img
+                      src="/images/Booking/plus.png"
+                      alt="plus-icon"
+                      className="w-3 h-3"
+                    />
+                    <span>Home Delivery Charges</span>
+                  </div>
+                  <span>₹{homeDeliveryCharges}</span>
+                </div>
+                <hr className="border-white/25" />
+              </>
+            )}
             <hr className="border-white/75" />
 
             <div className="my-2 flex items-center justify-between">
@@ -1068,9 +1191,33 @@ function BookingPage() {
           ) : (
             <div className="flex justify-center items-center">
               <button
-                className="text-black border-2 border-appColor bg-appColor hover:bg-transparent hover:border-appColor hover:border-2 hover:text-appColor px-6 py-2 rounded-lg font-semibold transition-colors duration-300 cursor-pointer"
+                className={`border-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-300 ${
+                  !customerUploadDetails ||
+                  (car.source === "ZT" &&
+                    (!street1.trim() ||
+                      !deliveryCity.trim() ||
+                      !zipcode.trim())) ||
+                  ((car.source === "Karyana" || car.source === "Zymo") &&
+                    deliveryType === "home-delivery" &&
+                    (!street1.trim() ||
+                      !deliveryCity.trim() ||
+                      !zipcode.trim()))
+                    ? "text-gray-400 border-gray-400 bg-transparent cursor-not-allowed"
+                    : "text-black border-appColor bg-appColor hover:bg-transparent hover:border-appColor hover:text-appColor cursor-pointer"
+                }`}
                 onClick={handlePayment}
-                disabled={!customerUploadDetails}
+                disabled={
+                  !customerUploadDetails ||
+                  (car.source === "ZT" &&
+                    (!street1.trim() ||
+                      !deliveryCity.trim() ||
+                      !zipcode.trim())) ||
+                  ((car.source === "Karyana" || car.source === "Zymo") &&
+                    deliveryType === "home-delivery" &&
+                    (!street1.trim() ||
+                      !deliveryCity.trim() ||
+                      !zipcode.trim()))
+                }
               >
                 Book & Pay
               </button>
@@ -1271,19 +1418,228 @@ function BookingPage() {
               )}
             </div>
           )}
-          {car.source === "Karyana" && (
+          {(car.source === "Karyana" || car.source === "Zymo") && (
             <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
               <div className="mt-5 mb-4">
-                <label className="block text-sm font-medium mb-1 text-[#faffa4]">
-                  Pickup Location
+                <label className="block text-sm font-medium mb-2 text-[#faffa4]">
+                  Delivery Option
                 </label>
-                <div className="bg-[#404040] text-white p-3 rounded-md">
-                  {car.pick_up_location
-                    ? car.pick_up_location
-                    : "Pickup location not available"}
+
+                {/* Delivery Type Selection */}
+                <div className="mb-4 space-y-3">
+                  <div
+                    className={`p-3 rounded-md cursor-pointer border-2 transition-colors ${
+                      deliveryType === "self-pickup"
+                        ? "border-[#faffa4] bg-[#404040]"
+                        : "border-gray-500 bg-[#404040] hover:border-gray-400"
+                    }`}
+                    onClick={() => setDeliveryType("self-pickup")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 ${
+                            deliveryType === "self-pickup"
+                              ? "border-[#faffa4] bg-[#faffa4]"
+                              : "border-gray-400"
+                          }`}
+                        ></div>
+                        <span className="text-white font-medium">
+                          Self Pickup
+                        </span>
+                      </div>
+                      <span className="text-green-400 text-sm">FREE</span>
+                    </div>
+                    <div className="text-gray-300 text-sm mt-2 ml-7">
+                      {car.pick_up_location ||
+                        car.pickupLocation ||
+                        "Pickup location not available"}
+                    </div>
+                  </div>
+
+                  <div
+                    className={`p-3 rounded-md cursor-pointer border-2 transition-colors ${
+                      deliveryType === "home-delivery"
+                        ? "border-[#faffa4] bg-[#404040]"
+                        : "border-gray-500 bg-[#404040] hover:border-gray-400"
+                    }`}
+                    onClick={() => setDeliveryType("home-delivery")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 ${
+                            deliveryType === "home-delivery"
+                              ? "border-[#faffa4] bg-[#faffa4]"
+                              : "border-gray-400"
+                          }`}
+                        ></div>
+                        <span className="text-white font-medium">
+                          Home Delivery
+                        </span>
+                      </div>
+                      <span className="text-[#faffa4] text-sm">
+                        {car.source === "Karyana" && homeDeliveryCharges > 0
+                          ? `₹${homeDeliveryCharges}`
+                          : car.source === "Zymo"
+                          ? "FREE"
+                          : "Available"}
+                      </span>
+                    </div>
+                    <div className="text-gray-300 text-sm mt-2 ml-7">
+                      Car will be delivered to your location
+                    </div>
+                  </div>
+                </div>
+
+                {/* Home Delivery Address Input */}
+                {deliveryType === "home-delivery" && (
+                  <div className="mt-4 space-y-4">
+                    <label className="block text-sm font-medium mb-2 text-[#faffa4]">
+                      Delivery Address
+                    </label>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <input
+                          type="text"
+                          className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                          placeholder="Street Address (Line 1) *"
+                          value={street1}
+                          onChange={(e) => setStreet1(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                          placeholder="Street Address (Line 2)"
+                          value={street2}
+                          onChange={(e) => setStreet2(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <input
+                            type="text"
+                            className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                            placeholder="City *"
+                            value={deliveryCity}
+                            onChange={(e) => setDeliveryCity(e.target.value)}
+                          />
+                        </div>
+
+                        <div>
+                          <input
+                            type="text"
+                            pattern="[0-9]{6}"
+                            maxLength={6}
+                            className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                            placeholder="Pin Code *"
+                            value={zipcode}
+                            onChange={(e) =>
+                              setZipcode(e.target.value.replace(/\D/g, ""))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* ZT Vendor - Home Delivery Only */}
+          {car.source === "ZT" && (
+            <div className="max-w-3xl mx-auto rounded-lg bg-[#303030] p-5">
+              <div className="mt-5 mb-4">
+                <label className="block text-sm font-medium mb-2 text-[#faffa4]">
+                  Delivery Option
+                </label>
+
+                {/* ZT Only supports home delivery */}
+                <div className="mb-4">
+                  <div className="p-3 rounded-md border-2 border-[#faffa4] bg-[#404040]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full border-2 border-[#faffa4] bg-[#faffa4]"></div>
+                        <span className="text-white font-medium">
+                          Home Delivery
+                        </span>
+                      </div>
+                      <span className="text-[#faffa4] text-sm">
+                        {car.deliveryCharge
+                          ? `₹${car.deliveryCharge}`
+                          : "Charges Apply"}
+                      </span>
+                    </div>
+                    <div className="text-gray-300 text-sm mt-2 ml-7">
+                      Car will be delivered to your location (Self pickup not
+                      available)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Home Delivery Address Input */}
+                <div className="mt-4 space-y-4">
+                  <label className="block text-sm font-medium mb-2 text-[#faffa4]">
+                    Delivery Address
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <input
+                        type="text"
+                        className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                        placeholder="Street Address (Line 1) *"
+                        value={street1}
+                        onChange={(e) => setStreet1(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                        placeholder="Street Address (Line 2)"
+                        value={street2}
+                        onChange={(e) => setStreet2(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <input
+                          type="text"
+                          className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                          placeholder="City *"
+                          value={deliveryCity}
+                          onChange={(e) => setDeliveryCity(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          pattern="[0-9]{6}"
+                          maxLength={6}
+                          className="w-full p-3 bg-[#404040] rounded-md text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-[#faffa4] focus:border-transparent"
+                          placeholder="Pin Code *"
+                          value={zipcode}
+                          onChange={(e) =>
+                            setZipcode(e.target.value.replace(/\D/g, ""))
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              {/* If you want to show drop location, add similar block here */}
             </div>
           )}
           {/* zoom car section */}
